@@ -43,9 +43,9 @@
     <script>
         const tempCtx = document.getElementById('tempChart').getContext('2d');
         const humidCtx = document.getElementById('humidChart').getContext('2d');
-        const googleScriptURL = "YOUR_GOOGLE_SCRIPT_URL?action=getLatest";
-        const googlePostURL = "YOUR_GOOGLE_SCRIPT_URL";
-        const telegramAPI = "https://api.telegram.org/botYOUR_BOT_TOKEN/getUpdates";
+        const googleScriptURL = "https://script.google.com/macros/s/AKfycbwuZQJJKxjZTrc9eLhQEacTagCJsVELs27KvoA9Nvgcxjf36ytwFFzQGiugl6hRQp0/exec?action=getLatest";
+        const googlePostURL = "https://script.google.com/macros/s/AKfycbwuZQJJKxjZTrc9eLhQEacTagCJsVELs27KvoA9Nvgcxjf36ytwFFzQGiugl6hRQp0/exec";
+        const telegramAPI = "https://api.telegram.org/bot7589064694:AAGK5lv0M-FFp2osqzsTFHQp5SJ8G8h-kwM/getUpdates";
         let notifActive = false;
         
         const tempChart = new Chart(tempCtx, {
