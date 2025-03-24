@@ -3,114 +3,72 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monitoring Suhu & Kelembapan</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <title>Temperature Monitor</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gauge.js/1.3.7/gauge.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <style>
-        body { text-align: center; font-family: Arial, sans-serif; }
-        canvas { max-width: 300px; margin: auto; }
-        .container { max-width: 500px; margin: auto; padding: 20px; }
-        .message-box, .control-box { margin-top: 20px; padding: 10px; border: 1px solid #ddd; }
-        .slider { width: 80%; }
-    </style>
 </head>
 <body>
-    <h2>Monitoring Suhu & Kelembapan</h2>
     <div class="container">
-        <canvas id="tempChart"></canvas>
-        <canvas id="humidChart"></canvas>
+        <h1>Temperature Monitor</h1>
+        <div id="temperature">Loading...</div>
+        <canvas id="gaugeCanvas"></canvas>
         
-        <div class="control-box">
-            <h3>Atur Batas Notifikasi</h3>
-            <p>Suhu: <span id="tempLower">20</span>°C - <span id="tempUpper">35</span>°C</p>
-            <input type="range" min="0" max="50" value="20" class="slider" id="tempLowerSlider">
-            <input type="range" min="0" max="50" value="35" class="slider" id="tempUpperSlider">
-            
-            <p>Kelembapan: <span id="humidLower">40</span>% - <span id="humidUpper">80</span>%</p>
-            <input type="range" min="0" max="100" value="40" class="slider" id="humidLowerSlider">
-            <input type="range" min="0" max="100" value="80" class="slider" id="humidUpperSlider">
-            
-            <button onclick="saveSettings()">Simpan Batas</button>
-            <button onclick="toggleNotification()" id="notifButton">Aktifkan Notifikasi</button>
-        </div>
+        <h2>Set Temperature Threshold</h2>
+        <label>High Temperature: <span id="high-temp-value">30</span>°C</label>
+        <input type="range" min="0" max="50" value="30" id="high-temp-slider">
+        <label>Low Temperature: <span id="low-temp-value">20</span>°C</label>
+        <input type="range" min="0" max="50" value="20" id="low-temp-slider">
+        <button id="save-settings">Save Settings</button>
         
-        <div class="message-box">
-            <h3>Pesan Telegram:</h3>
-            <p id="latestMessage">Menunggu pesan...</p>
-        </div>
+        <h2>Generate Report</h2>
+        <button id="daily-report">Daily Report</button>
+        <button id="weekly-report">Weekly Report</button>
+        <button id="monthly-report">Monthly Report</button>
     </div>
     
     <script>
-        const tempCtx = document.getElementById('tempChart').getContext('2d');
-        const humidCtx = document.getElementById('humidChart').getContext('2d');
-        const googleScriptURL = "https://script.google.com/macros/s/AKfycbwuZQJJKxjZTrc9eLhQEacTagCJsVELs27KvoA9Nvgcxjf36ytwFFzQGiugl6hRQp0/exec?action=getLatest";
-        const googlePostURL = "https://script.google.com/macros/s/AKfycbwuZQJJKxjZTrc9eLhQEacTagCJsVELs27KvoA9Nvgcxjf36ytwFFzQGiugl6hRQp0/exec";
-        const telegramAPI = "https://api.telegram.org/bot7589064694:AAGK5lv0M-FFp2osqzsTFHQp5SJ8G8h-kwM/getUpdates";
-        let notifActive = false;
+        const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwuZQJJKxjZTrc9eLhQEacTagCJsVELs27KvoA9Nvgcxjf36ytwFFzQGiugl6hRQp0/exec';
+        const telegramWebApp = window.Telegram.WebApp;
+        telegramWebApp.expand();
+        telegramWebApp.ready();
         
-        const tempChart = new Chart(tempCtx, {
-            type: 'doughnut',
-            data: { labels: ['Suhu', 'Max'], datasets: [{ data: [0, 100], backgroundColor: ['red', 'lightgray'] }] },
-            options: { responsive: true, cutout: '80%' }
-        });
-        
-        const humidChart = new Chart(humidCtx, {
-            type: 'doughnut',
-            data: { labels: ['Kelembapan', 'Max'], datasets: [{ data: [0, 100], backgroundColor: ['blue', 'lightgray'] }] },
-            options: { responsive: true, cutout: '80%' }
-        });
-        
-        function fetchData() {
-            fetch(googleScriptURL)
-                .then(response => response.json())
-                .then(data => {
-                    let suhu = parseFloat(data.temperature);
-                    let humidity = parseFloat(data.humidity);
-                    tempChart.data.datasets[0].data = [suhu, 100 - suhu];
-                    humidChart.data.datasets[0].data = [humidity, 100 - humidity];
-                    tempChart.update();
-                    humidChart.update();
-                });
+        async function fetchTemperature() {
+            try {
+                let response = await fetch(GOOGLE_SCRIPT_URL + "?action=getLatestTemperature");
+                let data = await response.json();
+                document.getElementById("temperature").innerText = `Current: ${data.temperature}°C`;
+            } catch (error) {
+                console.error("Error fetching temperature", error);
+            }
         }
         
-        function getTelegramMessages() {
-            fetch(telegramAPI)
-                .then(response => response.json())
-                .then(data => {
-                    let messages = data.result;
-                    if (messages.length > 0) {
-                        document.getElementById('latestMessage').innerText = messages[messages.length - 1].message.text;
-                    }
-                });
-        }
-        
-        function saveSettings() {
-            let tempLower = document.getElementById('tempLowerSlider').value;
-            let tempUpper = document.getElementById('tempUpperSlider').value;
-            let humidLower = document.getElementById('humidLowerSlider').value;
-            let humidUpper = document.getElementById('humidUpperSlider').value;
+        async function saveSettings() {
+            let highTemp = document.getElementById("high-temp-slider").value;
+            let lowTemp = document.getElementById("low-temp-slider").value;
             
-            document.getElementById('tempLower').innerText = tempLower;
-            document.getElementById('tempUpper').innerText = tempUpper;
-            document.getElementById('humidLower').innerText = humidLower;
-            document.getElementById('humidUpper').innerText = humidUpper;
-            
-            fetch(googlePostURL + `?action=setThreshold&tempLower=${tempLower}&tempUpper=${tempUpper}&humidLower=${humidLower}&humidUpper=${humidUpper}`, {
-                method: 'POST'
-            });
+            await fetch(GOOGLE_SCRIPT_URL + "?action=updateSettings&highTemp=" + highTemp + "&lowTemp=" + lowTemp, { method: 'POST' });
+            alert("Settings saved");
         }
         
-        function toggleNotification() {
-            notifActive = !notifActive;
-            document.getElementById('notifButton').innerText = notifActive ? 'Nonaktifkan Notifikasi' : 'Aktifkan Notifikasi';
-            
-            fetch(googlePostURL + `?action=toggleNotif&status=${notifActive ? 'on' : 'off'}`, {
-                method: 'POST'
-            });
+        async function generateReport(type) {
+            let response = await fetch(GOOGLE_SCRIPT_URL + "?action=generateReport&reportType=" + type);
+            let data = await response.json();
+            const { jsPDF } = window.jspdf;
+            let doc = new jsPDF();
+            doc.text(`Temperature Report: ${type.toUpperCase()}`, 10, 10);
+            doc.text(`Average: ${data.statistics.average}°C`, 10, 20);
+            doc.save(`${type}-report.pdf`);
         }
         
-        setInterval(fetchData, 5000);
-        setInterval(getTelegramMessages, 5000);
+        document.getElementById("save-settings").addEventListener("click", saveSettings);
+        document.getElementById("daily-report").addEventListener("click", () => generateReport("daily"));
+        document.getElementById("weekly-report").addEventListener("click", () => generateReport("weekly"));
+        document.getElementById("monthly-report").addEventListener("click", () => generateReport("monthly"));
+        
+        fetchTemperature();
+        setInterval(fetchTemperature, 5000);
     </script>
 </body>
 </html>
