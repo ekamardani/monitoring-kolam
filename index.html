@@ -8,67 +8,397 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gauge.js/1.3.7/gauge.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        /* Existing styles from the previous file remain the same */
+    </style>
 </head>
 <body>
     <div class="container">
         <h1>Temperature Monitor</h1>
-        <div id="temperature">Loading...</div>
-        <canvas id="gaugeCanvas"></canvas>
         
-        <h2>Set Temperature Threshold</h2>
-        <label>High Temperature: <span id="high-temp-value">30</span>°C</label>
-        <input type="range" min="0" max="50" value="30" id="high-temp-slider">
-        <label>Low Temperature: <span id="low-temp-value">20</span>°C</label>
-        <input type="range" min="0" max="50" value="20" id="low-temp-slider">
-        <button id="save-settings">Save Settings</button>
+        <div class="tabs">
+            <div class="tab active" data-tab="dashboard">Dashboard</div>
+            <div class="tab" data-tab="settings">Settings</div>
+            <div class="tab" data-tab="reports">Reports</div>
+        </div>
         
-        <h2>Generate Report</h2>
-        <button id="daily-report">Daily Report</button>
-        <button id="weekly-report">Weekly Report</button>
-        <button id="monthly-report">Monthly Report</button>
+        <div id="dashboard" class="tab-content active">
+            <div class="card">
+                <h2>Current Temperature</h2>
+                <div class="gauge-container">
+                    <canvas id="temperature-gauge"></canvas>
+                    <div class="gauge-value" id="temperature-value">--°C</div>
+                </div>
+                <div class="temperature-label">Last updated: <span id="last-updated">--</span></div>
+            </div>
+            
+            <div class="card">
+                <h2>Average Temperatures</h2>
+                <div class="averages-card">
+                    <div class="average-box">
+                        <div class="average-value" id="daily-avg">--°C</div>
+                        <div class="average-label">Daily</div>
+                    </div>
+                    <div class="average-box">
+                        <div class="average-value" id="weekly-avg">--°C</div>
+                        <div class="average-label">Weekly</div>
+                    </div>
+                    <div class="average-box">
+                        <div class="average-value" id="monthly-avg">--°C</div>
+                        <div class="average-label">Monthly</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2>Temperature Trends</h2>
+                <canvas id="temperature-chart"></canvas>
+            </div>
+        </div>
+        
+        <div id="settings" class="tab-content">
+            <div class="card">
+                <h2>Temperature Thresholds</h2>
+                
+                <div class="slider-container">
+                    <div class="slider-label">
+                        <span>High Temperature Threshold</span>
+                        <span id="high-temp-value">30°C</span>
+                    </div>
+                    <input type="range" min="0" max="50" value="30" class="slider" id="high-temp-slider">
+                </div>
+                
+                <div class="slider-container">
+                    <div class="slider-label">
+                        <span>Low Temperature Threshold</span>
+                        <span id="low-temp-value">20°C</span>
+                    </div>
+                    <input type="range" min="0" max="50" value="20" class="slider" id="low-temp-slider">
+                </div>
+                
+                <div class="notification-toggle">
+                    <span>Enable Notifications</span>
+                    <label class="toggle">
+                        <input type="checkbox" id="notification-toggle" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                
+                <button class="button" id="save-settings-btn">Save Settings</button>
+            </div>
+        </div>
+        
+        <div id="reports" class="tab-content">
+            <div class="card">
+                <h2>Generate Reports</h2>
+                <p>Generate detailed PDF reports with temperature analysis.</p>
+                
+                <div class="report-buttons">
+                    <button class="report-button" id="daily-report-btn">Daily Report</button>
+                    <button class="report-button" id="weekly-report-btn">Weekly Report</button>
+                    <button class="report-button" id="monthly-report-btn">Monthly Report</button>
+                </div>
+                <div id="report-status" class="loading" style="display: none;">Generating report...</div>
+            </div>
+        </div>
     </div>
-    
+
     <script>
-        const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwuZQJJKxjZTrc9eLhQEacTagCJsVELs27KvoA9Nvgcxjf36ytwFFzQGiugl6hRQp0/exec';
+        // Initialize Telegram WebApp
         const telegramWebApp = window.Telegram.WebApp;
         telegramWebApp.expand();
         telegramWebApp.ready();
+
+        // API endpoints
+        const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwuZQJJKxjZTrc9eLhQEacTagCJsVELs27KvoA9Nvgcxjf36ytwFFzQGiugl6hRQp0/exec';
         
-        async function fetchTemperature() {
-            try {
-                let response = await fetch(GOOGLE_SCRIPT_URL + "?action=getLatestTemperature");
-                let data = await response.json();
-                document.getElementById("temperature").innerText = `Current: ${data.temperature}°C`;
-            } catch (error) {
-                console.error("Error fetching temperature", error);
-            }
-        }
+        // Settings variables
+        let highTempThreshold = 30;
+        let lowTempThreshold = 20;
+        let notificationsEnabled = true;
         
-        async function saveSettings() {
-            let highTemp = document.getElementById("high-temp-slider").value;
-            let lowTemp = document.getElementById("low-temp-slider").value;
+        // Charts and gauges
+        let temperatureChart;
+        let temperatureGauge;
+        
+        // Initialize UI
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize tabs
+            const tabs = document.querySelectorAll('.tab');
+            const tabContents = document.querySelectorAll('.tab-content');
             
-            await fetch(GOOGLE_SCRIPT_URL + "?action=updateSettings&highTemp=" + highTemp + "&lowTemp=" + lowTemp, { method: 'POST' });
-            alert("Settings saved");
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    const tabId = tab.getAttribute('data-tab');
+                    
+                    tabs.forEach(t => t.classList.remove('active'));
+                    tabContents.forEach(tc => tc.classList.remove('active'));
+                    
+                    tab.classList.add('active');
+                    document.getElementById(tabId).classList.add('active');
+                });
+            });
+            
+            // Initialize temperature gauge
+            temperatureGauge = new Gauge(document.getElementById('temperature-gauge')).setOptions({
+                angle: 0,
+                lineWidth: 0.2,
+                radiusScale: 0.9,
+                pointer: {
+                    length: 0.6,
+                    strokeWidth: 0.03,
+                    color: '#000000'
+                },
+                limitMax: false,
+                limitMin: false,
+                colorStart: '#6FADCF',
+                colorStop: '#8FC0DA',
+                strokeColor: '#E0E0E0',
+                generateGradient: true
+            });
+            temperatureGauge.maxValue = 50;
+            temperatureGauge.animationSpeed = 32;
+            temperatureGauge.set(0);
+
+            // Initialize temperature chart
+            const ctx = document.getElementById('temperature-chart').getContext('2d');
+            temperatureChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Temperature (°C)',
+                        data: [],
+                        borderColor: 'rgb(75, 192, 192)',
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: false
+                        }
+                    }
+                }
+            });
+
+            // Slider event listeners
+            const highTempSlider = document.getElementById('high-temp-slider');
+            const lowTempSlider = document.getElementById('low-temp-slider');
+            const highTempValue = document.getElementById('high-temp-value');
+            const lowTempValue = document.getElementById('low-temp-value');
+
+            highTempSlider.addEventListener('input', () => {
+                highTempValue.textContent = `${highTempSlider.value}°C`;
+                highTempThreshold = parseFloat(highTempSlider.value);
+            });
+
+            lowTempSlider.addEventListener('input', () => {
+                lowTempValue.textContent = `${lowTempSlider.value}°C`;
+                lowTempThreshold = parseFloat(lowTempSlider.value);
+            });
+
+            // Save settings button
+            const saveSettingsBtn = document.getElementById('save-settings-btn');
+            saveSettingsBtn.addEventListener('click', saveSettings);
+
+            // Notification toggle
+            const notificationToggle = document.getElementById('notification-toggle');
+            notificationToggle.addEventListener('change', () => {
+                notificationsEnabled = notificationToggle.checked;
+            });
+
+            // Report buttons
+            const dailyReportBtn = document.getElementById('daily-report-btn');
+            const weeklyReportBtn = document.getElementById('weekly-report-btn');
+            const monthlyReportBtn = document.getElementById('monthly-report-btn');
+
+            dailyReportBtn.addEventListener('click', () => generateReport('daily'));
+            weeklyReportBtn.addEventListener('click', () => generateReport('weekly'));
+            monthlyReportBtn.addEventListener('click', () => generateReport('monthly'));
+
+            // Initial data fetch
+            fetchSettings();
+            fetchLatestTemperature();
+            fetchAverages();
+            fetchTemperatureHistory();
+        });
+
+        // Fetch settings from Google Sheets
+        function fetchSettings() {
+            fetch(`${GOOGLE_SCRIPT_URL}?action=getSettings`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        highTempThreshold = data.highTemp;
+                        lowTempThreshold = data.lowTemp;
+                        notificationsEnabled = data.notificationsEnabled;
+
+                        // Update UI
+                        document.getElementById('high-temp-slider').value = highTempThreshold;
+                        document.getElementById('low-temp-slider').value = lowTempThreshold;
+                        document.getElementById('high-temp-value').textContent = `${highTempThreshold}°C`;
+                        document.getElementById('low-temp-value').textContent = `${lowTempThreshold}°C`;
+                        document.getElementById('notification-toggle').checked = notificationsEnabled;
+                    }
+                })
+                .catch(error => console.error('Error fetching settings:', error));
         }
-        
-        async function generateReport(type) {
-            let response = await fetch(GOOGLE_SCRIPT_URL + "?action=generateReport&reportType=" + type);
-            let data = await response.json();
-            const { jsPDF } = window.jspdf;
-            let doc = new jsPDF();
-            doc.text(`Temperature Report: ${type.toUpperCase()}`, 10, 10);
-            doc.text(`Average: ${data.statistics.average}°C`, 10, 20);
-            doc.save(`${type}-report.pdf`);
+
+        // Save settings to Google Sheets
+        function saveSettings() {
+            const formData = new URLSearchParams();
+            formData.append('action', 'updateSettings');
+            formData.append('highTemp', highTempThreshold);
+            formData.append('lowTemp', lowTempThreshold);
+            formData.append('notificationsEnabled', notificationsEnabled);
+
+            fetch(GOOGLE_SCRIPT_URL, {
+                method: 'POST',
+                body: formData
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        telegramWebApp.showAlert('Settings saved successfully!');
+                    } else {
+                        telegramWebApp.showAlert('Failed to save settings.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error saving settings:', error);
+                    telegramWebApp.showAlert('An error occurred while saving settings.');
+                });
         }
-        
-        document.getElementById("save-settings").addEventListener("click", saveSettings);
-        document.getElementById("daily-report").addEventListener("click", () => generateReport("daily"));
-        document.getElementById("weekly-report").addEventListener("click", () => generateReport("weekly"));
-        document.getElementById("monthly-report").addEventListener("click", () => generateReport("monthly"));
-        
-        fetchTemperature();
-        setInterval(fetchTemperature, 5000);
+
+        // Fetch latest temperature
+        function fetchLatestTemperature() {
+            fetch(`${GOOGLE_SCRIPT_URL}?action=getLatestTemperature`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        const temperature = data.temperature;
+                        const timestamp = new Date(data.timestamp);
+
+                        document.getElementById('temperature-value').textContent = `${temperature}°C`;
+                        document.getElementById('last-updated').textContent = timestamp.toLocaleString();
+
+                        // Update gauge
+                        temperatureGauge.set(temperature);
+                    }
+                })
+                .catch(error => console.error('Error fetching latest temperature:', error));
+        }
+
+        // Fetch temperature averages
+        function fetchAverages() {
+            fetch(`${GOOGLE_SCRIPT_URL}?action=getAverages`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        document.getElementById('daily-avg').textContent = `${data.dailyAverage}°C`;
+                        document.getElementById('weekly-avg').textContent = `${data.weeklyAverage}°C`;
+                        document.getElementById('monthly-avg').textContent = `${data.monthlyAverage}°C`;
+                    }
+                })
+                .catch(error => console.error('Error fetching temperature averages:', error));
+        }
+
+        // Fetch temperature history for chart
+        function fetchTemperatureHistory() {
+            // This would typically involve fetching historical data from the server
+            // For now, we'll use a placeholder implementation
+            const historicalData = [
+                { timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000), temperature: 25 },
+                { timestamp: new Date(Date.now() - 18 * 60 * 60 * 1000), temperature: 27 },
+                { timestamp: new Date(Date.now() - 12 * 60 * 60 * 1000), temperature: 26 },
+                { timestamp: new Date(Date.now() - 6 * 60 * 60 * 1000), temperature: 28 },
+                { timestamp: new Date(), temperature: 26 }
+            ];
+
+            // Update chart data
+            temperatureChart.data.labels = historicalData.map(d => d.timestamp.toLocaleTimeString());
+            temperatureChart.data.datasets[0].data = historicalData.map(d => d.temperature);
+            temperatureChart.update();
+        }
+
+        // Generate report
+        function generateReport(reportType) {
+            const reportStatus = document.getElementById('report-status');
+            reportStatus.style.display = 'block';
+
+            fetch(`${GOOGLE_SCRIPT_URL}?action=generateReport&reportType=${reportType}`)
+                .then(response => response.json())
+                .then(data => {
+                    reportStatus.style.display = 'none';
+
+                    if (data.status === 'success') {
+                        // Create PDF using jsPDF
+                        const { jsPDF } = window.jspdf;
+                        const doc = new jsPDF({
+                            orientation: 'portrait',
+                            unit: 'mm',
+                            format: 'a4'
+                        });
+
+                        // Report title and header
+                        doc.setFontSize(18);
+                        doc.text(data.reportTitle, 105, 20, { align: 'center' });
+                        doc.setFontSize(10);
+                        doc.text(`Time Frame: ${data.timeFrame}`, 105, 28, { align: 'center' });
+                        doc.text(`Generated: ${new Date(data.generatedDate).toLocaleString()}`, 105, 34, { align: 'center' });
+
+                        // Statistics section
+                        doc.setFontSize(12);
+                        doc.text('Temperature Statistics', 20, 50);
+                        doc.line(20, 55, 190, 55);
+
+                        doc.setFontSize(10);
+                        doc.text(`Average Temperature: ${data.statistics.average.toFixed(2)}°C`, 20, 62);
+                        doc.text(`Minimum Temperature: ${data.statistics.min.toFixed(2)}°C`, 20, 68);
+                        doc.text(`Maximum Temperature: ${data.statistics.max.toFixed(2)}°C`, 20, 74);
+                        doc.text(`Total Readings: ${data.statistics.readings}`, 20, 80);
+
+                        // Hourly Trends section
+                        doc.setFontSize(12);
+                        doc.text('Hourly Temperature Trends', 20, 95);
+                        doc.line(20, 100, 190, 100);
+
+                        doc.setFontSize(10);
+                        data.hourlyTrends.forEach((trend, index) => {
+                            doc.text(`${trend.hour}:00: ${trend.average.toFixed(2)}°C`, 20, 108 + (index * 6));
+                        });
+
+                        // Recommendations section
+                        doc.setFontSize(12);
+                        doc.text('Recommendations', 20, 160);
+                        doc.line(20, 165, 190, 165);
+
+                        // Wrap recommendation text
+                        const splitText = doc.splitTextToSize(data.recommendation, 170);
+                        doc.setFontSize(10);
+                        doc.text(splitText, 20, 172);
+
+                        // Save or open PDF
+                        doc.save(`${reportType}_temperature_report.pdf`);
+                    } else {
+                        telegramWebApp.showAlert('Failed to generate report.');
+                    }
+                })
+                .catch(error => {
+                    reportStatus.style.display = 'none';
+                    console.error('Error generating report:', error);
+                    telegramWebApp.showAlert('An error occurred while generating the report.');
+                });
+        }
+
+        // Periodic updates
+        setInterval(() => {
+            fetchLatestTemperature();
+            fetchAverages();
+            fetchTemperatureHistory();
+        }, 60000); // Update every minute
     </script>
 </body>
 </html>
