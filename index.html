@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Temperature Monitor</title>
+    <title>Pengawasan Kolam Ikan</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gauge.js/1.3.7/gauge.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -239,17 +239,17 @@
 </head>
 <body>
     <div class="container">
-        <h1>Temperature Monitor</h1>
+        <h1>Pemantauan Suhu</h1>
         
         <div class="tabs">
-            <div class="tab active" data-tab="dashboard">Dashboard</div>
-            <div class="tab" data-tab="settings">Settings</div>
-            <div class="tab" data-tab="reports">Reports</div>
+            <div class="tab active" data-tab="dashboard">Dasbor</div>
+            <div class="tab" data-tab="settings">Pengaturan</div>
+            <div class="tab" data-tab="reports">Laporan</div>
         </div>
         
         <div id="dashboard" class="tab-content active">
             <div class="card">
-                <h2>Current Temperature</h2>
+                <h2>Suhu Terkini</h2>
                 <div class="gauge-container">
                     <canvas id="temperature-gauge"></canvas>
                     <div class="gauge-value" id="temperature-value">--°C</div>
@@ -258,36 +258,36 @@
             </div>
             
             <div class="card">
-                <h2>Average Temperatures</h2>
+                <h2>Suhu Rata-rata</h2>
                 <div class="averages-card">
                     <div class="average-box">
                         <div class="average-value" id="daily-avg">--°C</div>
-                        <div class="average-label">Daily</div>
+                        <div class="average-label">Harian</div>
                     </div>
                     <div class="average-box">
                         <div class="average-value" id="weekly-avg">--°C</div>
-                        <div class="average-label">Weekly</div>
+                        <div class="average-label">Mingguan</div>
                     </div>
                     <div class="average-box">
                         <div class="average-value" id="monthly-avg">--°C</div>
-                        <div class="average-label">Monthly</div>
+                        <div class="average-label">Bulanan</div>
                     </div>
                 </div>
             </div>
             
             <div class="card">
-                <h2>Temperature Trends</h2>
+                <h2>Kecenderungan Suhu</h2>
                 <canvas id="temperature-chart"></canvas>
             </div>
         </div>
         
         <div id="settings" class="tab-content">
             <div class="card">
-                <h2>Temperature Thresholds</h2>
+                <h2>Ambang Batas Suhu</h2>
                 
                 <div class="slider-container">
                     <div class="slider-label">
-                        <span>High Temperature Threshold</span>
+                        <span>Suhu Terendah</span>
                         <span id="high-temp-value">30°C</span>
                     </div>
                     <input type="range" min="0" max="50" value="30" class="slider" id="high-temp-slider">
@@ -295,35 +295,35 @@
                 
                 <div class="slider-container">
                     <div class="slider-label">
-                        <span>Low Temperature Threshold</span>
+                        <span>Suhu Tertinggi</span>
                         <span id="low-temp-value">20°C</span>
                     </div>
                     <input type="range" min="0" max="50" value="20" class="slider" id="low-temp-slider">
                 </div>
                 
                 <div class="notification-toggle">
-                    <span>Enable Notifications</span>
+                    <span>Aktifkan Pemberitahuan</span>
                     <label class="toggle">
                         <input type="checkbox" id="notification-toggle" checked>
                         <span class="toggle-slider"></span>
                     </label>
                 </div>
                 
-                <button class="button" id="save-settings-btn">Save Settings</button>
+                <button class="button" id="save-settings-btn">Simpan Pengaturan</button>
             </div>
         </div>
         
         <div id="reports" class="tab-content">
             <div class="card">
-                <h2>Generate Reports</h2>
-                <p>Generate detailed PDF reports with temperature analysis.</p>
+                <h2>Hasilkan Laporan</h2>
+                <p>Hasilkan laporan PDF terperinci dengan analisis suhu.</p>
                 
                 <div class="report-buttons">
-                    <button class="report-button" id="daily-report-btn">Daily Report</button>
-                    <button class="report-button" id="weekly-report-btn">Weekly Report</button>
-                    <button class="report-button" id="monthly-report-btn">Monthly Report</button>
+                    <button class="report-button" id="daily-report-btn">Laporan Harian</button>
+                    <button class="report-button" id="weekly-report-btn">Laporan Mingguan</button>
+                    <button class="report-button" id="monthly-report-btn">Laporan Bulanan</button>
                 </div>
-                <div id="report-status" class="loading" style="display: none;">Generating report...</div>
+                <div id="report-status" class="loading" style="display: none;">Sedang menghasilkan laporan...</div>
             </div>
         </div>
     </div>
